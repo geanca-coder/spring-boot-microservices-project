@@ -13,6 +13,11 @@ on:  # executit on push or pull_request
     branches: [ "master" ]
   workflow_dispatch:
     
+env: 
+  PROJECT_ID: ${{ secrets.GKE_PROJECT }}
+  GKE_CLUSTER: cluster-1
+  CKE_ZONE: us-central1-c
+
 
 jobs:
   #first job
@@ -48,7 +53,6 @@ jobs:
           MAVEN_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
 
-
     - name: Building and Pushing cloud-config-server
       run: mvn package dockerfile:push --file cloud-config-server/pom.xml
       env: 
@@ -61,9 +65,23 @@ jobs:
           MAVEN_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
 
-    - name: Building and Pushing user-registry
-      run: mvn package dockerfile:push --file user-registry/pom.xml
+    - name: Building and Pushing service-registry
+      run: mvn package dockerfile:push --file service-registry/pom.xml
       env: 
           MAVEN_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-      
+  
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    - name: kubectl - Google Cloud GKE cluster.
+      uses: ameydev/gke-kubectlaction@master
+      env:
+        PROJECT_ID: ${{ env.PROJECT_ID }}
+        APPLICATON_CREDENTIALS: ${{ secrets.GKE_SA_KEY }}   
+        CLUSTER_NAME:  ${{ env.GKE_CLUSTER }}
+        ZONE_NAME: ${{ env.GKE_ZONE }}
+      with:
+        args: apply  -f k8s/
